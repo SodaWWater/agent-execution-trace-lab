@@ -1,0 +1,8 @@
+# 采购异常订单核查摘要
+
+{
+  "orders": [
+    {"id": "PO-1001", "supplier": "华北供应商", "amount": 12800, "status": "pending", "flag": "金额超过抽查阈值"},
+    {"id": "PO-1002", "supplier": "华东供应商", "amount": 3200, "status": "approved", "flag": null}
+  ]
+}

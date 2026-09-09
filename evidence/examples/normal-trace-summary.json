@@ -1,0 +1,6 @@
+{
+  "mode": "normal",
+  "expected_status": "COMPLETED",
+  "event_order": ["task_started", "model_decision", "tool_call_intent", "tool_succeeded", "final_result"],
+  "generated_by": "python scripts/run_demo.py --mode normal"
+}
