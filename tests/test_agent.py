@@ -66,17 +66,20 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(result["status"], "FAILED")
 
     def test_intent_before_execution(self):
-        result, path = self.run_runtime()
+        result, path = self.run_runtime({"read_text_once": True})
         events = json.loads(path.read_text())["events"]
+        intent_counts = {}
+        execution_counts = {}
         for index, event in enumerate(events):
-            if event["event_type"] not in {"tool_succeeded", "tool_failed"}:
-                continue
-            prior_intents = [
-                candidate for candidate in events[:index]
-                if candidate["event_type"] == "tool_call_intent"
-                and candidate["tool_name"] == event["tool_name"]
-            ]
-            self.assertTrue(prior_intents, f"missing prior intent for {event['tool_name']}")
+            tool = event.get("tool_name")
+            if event["event_type"] == "tool_call_intent":
+                intent_counts[tool] = intent_counts.get(tool, 0) + 1
+            elif event["event_type"] in {"tool_succeeded", "tool_failed"}:
+                execution_counts[tool] = execution_counts.get(tool, 0) + 1
+                self.assertGreaterEqual(
+                    intent_counts.get(tool, 0), execution_counts[tool],
+                    f"execution for {tool} occurred before its intent",
+                )
 
 
 if __name__ == "__main__":
