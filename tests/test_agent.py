@@ -25,6 +25,28 @@ class AgentTests(unittest.TestCase):
         result, _ = self.run_runtime()
         self.assertEqual(result["status"], State.COMPLETED.value)
 
+    def test_report_summarizes_flagged_order(self):
+        result, _ = self.run_runtime()
+        self.assertEqual(result["status"], State.COMPLETED.value)
+        report = (ROOT / "fixtures" / "workspace" / "reports" / "order-review.md").read_text(encoding="utf-8")
+        for expected in ("PO-1001", "华北供应商", "12800", "金额超过 10000 元", "待审批", "需要人工复核"):
+            self.assertIn(expected, report)
+
+    def test_trace_reads_rules_before_writing_report(self):
+        result, path = self.run_runtime()
+        self.assertEqual(result["status"], State.COMPLETED.value)
+        events = json.loads(path.read_text(encoding="utf-8"))["events"]
+        tool_successes = [
+            e["tool_name"] for e in events if e["event_type"] == "tool_succeeded"
+        ]
+        self.assertEqual(tool_successes[:4], ["list_files", "read_text", "read_text", "write_report"])
+        read_intents = [
+            e["input_summary"].get("relative_path")
+            for e in events
+            if e["event_type"] == "tool_call_intent" and e["tool_name"] == "read_text"
+        ]
+        self.assertIn("rules.md", read_intents)
+
     def test_failure_retries(self):
         result, path = self.run_runtime({"read_text_once": True})
         self.assertEqual(result["status"], "COMPLETED")
@@ -46,10 +68,15 @@ class AgentTests(unittest.TestCase):
     def test_intent_before_execution(self):
         result, path = self.run_runtime()
         events = json.loads(path.read_text())["events"]
-        intents = [e["event_id"] for e in events if e["event_type"] == "tool_call_intent"]
-        successes = [e["event_id"] for e in events if e["event_type"] == "tool_succeeded"]
-        self.assertTrue(intents and successes)
-        self.assertLess(intents[0], successes[0])
+        for index, event in enumerate(events):
+            if event["event_type"] not in {"tool_succeeded", "tool_failed"}:
+                continue
+            prior_intents = [
+                candidate for candidate in events[:index]
+                if candidate["event_type"] == "tool_call_intent"
+                and candidate["tool_name"] == event["tool_name"]
+            ]
+            self.assertTrue(prior_intents, f"missing prior intent for {event['tool_name']}")
 
 
 if __name__ == "__main__":
